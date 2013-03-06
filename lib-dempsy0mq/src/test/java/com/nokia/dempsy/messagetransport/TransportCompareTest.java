@@ -78,15 +78,15 @@ public class TransportCompareTest
          long rate = timeMessageSending(tcp,messageSource);
          System.out.println("Message rate: " + rate + " msg/sec");
       }
-//      System.out.println("Testing Tcp batched");
-//      for (int i = 0; i < 3; i++)
-//      {
-//         TcpTransport tcp = new TcpTransport();
-//         tcp.setBatchOutgoingMessages(true);
-//         tcp.setMaxNumberOfQueuedOutbound(-1);
-//         long rate = timeMessageSending(tcp,messageSource);
-//         System.out.println("Message rate: " + rate + " msg/sec");
-//      }
+      System.out.println("Testing Tcp batched");
+      for (int i = 0; i < 3; i++)
+      {
+         TcpTransport tcp = new TcpTransport();
+         tcp.setBatchOutgoingMessages(true);
+         tcp.setMaxNumberOfQueuedOutbound(-1);
+         long rate = timeMessageSending(tcp,messageSource);
+         System.out.println("Message rate: " + rate + " msg/sec");
+      }
       System.out.println("Finished with test.");
       //==================================================================
    }

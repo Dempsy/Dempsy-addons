@@ -119,28 +119,18 @@ public class ZmqTransport implements Transport
       {
          // mark as failed by default.
          messageToFill.messageSize = 0;
-//         socket.poll();
-//         if (socket.isInterrupted() && !socketIsOpen)
-//            return;
-//         else if (socket.hasData())
-//         {
-            // TODO: Fix this to read in one message.
-//            final byte[] receiverIndex = isoc.recv();
-//            if (receiverIndex.length != 1 || !isoc.hasReceiveMore())
-//               throw new IOException("There appears to be an issue with the channel corruption for ZmqReceiver " + destination + ". Resetting it.");
-//            messageToFill.receiverIndex = receiverIndex[0] & 0xff;
-//            isoc.poll();
-//            if (isoc.isInterrupted() && !socketIsOpen)
-//               return;
-            messageToFill.receiverIndex = 0;
-            final byte[] msg = socket.recv();
-            if (msg == null) // should only be possible on an interrupt
-               return;
-            messageToFill.message = msg;
-            messageToFill.messageSize = messageToFill.message.length;
-//            if (logger.isTraceEnabled())
-//               logger.trace("Received message at " + destination);
-//         }
+         // TODO: Fix this to read in one message.
+         final byte[] receiverIndex = socket.recv();
+         if (receiverIndex == null) // should only be possible on an interrupt
+            return;
+         if (receiverIndex.length != 1)
+            throw new IOException("There appears to be an issue with the channel corruption for ZmqReceiver " + destination + ". Resetting it.");
+         messageToFill.receiverIndex = (receiverIndex[0] & 0xff);
+         final byte[] msg = socket.recv();
+         if (msg == null) // should only be possible on an interrupt
+            return;
+         messageToFill.message = msg;
+         messageToFill.messageSize = messageToFill.message.length;
       }
 
       @Override
@@ -267,14 +257,11 @@ public class ZmqTransport implements Transport
                   }
 
                   curReceiverIndex[0] = (byte)message.getReceiverIndex();
-//                  if (!socket.send(curReceiverIndex,ZMQ.SNDMORE))
-//                     throw new MessageTransportException("Send failed. Who knows why?");
+                  if (!socket.send(curReceiverIndex,ZMQ.SNDMORE))
+                     throw new MessageTransportException("Send failed. Who knows why?");
                   
                   if (!socket.send(message.messageBytes,0))
                      throw new MessageTransportException("Send failed. Who knows why?");
-                  
-//                  if (logger.isTraceEnabled())
-//                     logger.trace("Sent message to " + destination);
                }
 
                @Override protected void flush() { }
