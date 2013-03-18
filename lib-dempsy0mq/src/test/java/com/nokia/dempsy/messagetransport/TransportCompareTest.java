@@ -32,6 +32,8 @@ import com.nokia.dempsy.executor.DefaultDempsyExecutor;
 import com.nokia.dempsy.messagetransport.tcp.TcpTransport;
 import com.nokia.dempsy.messagetransport.zmq.ZmqTransport;
 import com.nokia.dempsy.monitoring.basic.BasicStatsCollector;
+import com.nokia.dempsy.util.MessageBufferInput;
+import com.nokia.dempsy.util.MessageBufferOutput;
 
 public class TransportCompareTest
 {
@@ -54,9 +56,11 @@ public class TransportCompareTest
       Random random = new Random();
       final int totalMessages = baseNumberOfMessages + (random.nextInt(numberOfMessagesVariablility / 2) - (numberOfMessagesVariablility / 2));
       final byte[][] messageSource = new byte[totalMessages][];
+      long totalBytes = 0;
       for (int i = 0; i < totalMessages; i++)
       {
          final int nextMessageLength = baseMessageLength + (random.nextInt(messageLengthVariability / 2) - (messageLengthVariability / 2));
+         totalBytes += nextMessageLength;
          messageSource[i] = new byte[nextMessageLength];
          random.nextBytes(messageSource[i]);
       }
@@ -66,8 +70,17 @@ public class TransportCompareTest
       {
          ZmqTransport zmq = new ZmqTransport();
          zmq.setMaxNumberOfQueuedOutbound(-1);
-         long rate = timeMessageSending(zmq,messageSource);
-         System.out.println("Message rate: " + rate + " msg/sec");
+         long time = timeMessageSending(zmq,false,messageSource);
+         System.out.format("Message rate: %,d msg/sec. %,d bytes/sec.%n",((totalMessages * 1000) / time), ((totalBytes * 1000) / time));
+      }
+      System.out.println("Testing 0mq Blocking");
+      for (int i = 0; i < 3; i++)
+      {
+         ZmqTransport zmq = new ZmqTransport();
+         zmq.setBlocking(true);
+         zmq.setMaxNumberOfQueuedOutbound(10000);
+         long time = timeMessageSending(zmq,true,messageSource);
+         System.out.format("Message rate: %,d msg/sec. %,d bytes/sec.%n",((totalMessages * 1000) / time), ((totalBytes * 1000) / time));
       }
       System.out.println("Testing Tcp");
       for (int i = 0; i < 3; i++)
@@ -75,8 +88,18 @@ public class TransportCompareTest
          TcpTransport tcp = new TcpTransport();
          tcp.setBatchOutgoingMessages(false);
          tcp.setMaxNumberOfQueuedOutbound(-1);
-         long rate = timeMessageSending(tcp,messageSource);
-         System.out.println("Message rate: " + rate + " msg/sec");
+         long time = timeMessageSending(tcp,false,messageSource);
+         System.out.format("Message rate: %,d msg/sec. %,d bytes/sec.%n",((totalMessages * 1000) / time), ((totalBytes * 1000) / time));
+      }
+      System.out.println("Testing Tcp Blocking");
+      for (int i = 0; i < 3; i++)
+      {
+         TcpTransport tcp = new TcpTransport();
+         tcp.setBatchOutgoingMessages(false);
+         tcp.setMaxNumberOfQueuedOutbound(10000);
+         tcp.setBlocking(true);
+         long time = timeMessageSending(tcp,true,messageSource);
+         System.out.format("Message rate: %,d msg/sec. %,d bytes/sec.%n",((totalMessages * 1000) / time), ((totalBytes * 1000) / time));
       }
       System.out.println("Testing Tcp batched");
       for (int i = 0; i < 3; i++)
@@ -84,17 +107,30 @@ public class TransportCompareTest
          TcpTransport tcp = new TcpTransport();
          tcp.setBatchOutgoingMessages(true);
          tcp.setMaxNumberOfQueuedOutbound(-1);
-         long rate = timeMessageSending(tcp,messageSource);
-         System.out.println("Message rate: " + rate + " msg/sec");
+         long time = timeMessageSending(tcp,false,messageSource);
+         System.out.format("Message rate: %,d msg/sec. %,d bytes/sec.%n",((totalMessages * 1000) / time), ((totalBytes * 1000) / time));
+      }
+      System.out.println("Testing Tcp batched and blocking");
+      for (int i = 0; i < 3; i++)
+      {
+         TcpTransport tcp = new TcpTransport();
+         tcp.setBatchOutgoingMessages(true);
+         tcp.setMaxNumberOfQueuedOutbound(10000);
+         tcp.setBlocking(true);
+         long time = timeMessageSending(tcp,true,messageSource);
+         System.out.format("Message rate: %,d msg/sec. %,d bytes/sec.%n",((totalMessages * 1000) / time), ((totalBytes * 1000) / time));
       }
       System.out.println("Finished with test.");
       //==================================================================
    }
    
-   private long timeMessageSending(final Transport transport, final byte[][] messages) throws Throwable
+   private long timeMessageSending(final Transport transport, boolean blocking, final byte[][] messages) throws Throwable
    {
-      DefaultDempsyExecutor inboundExecutor = new DefaultDempsyExecutor(1,-1);
-      inboundExecutor.setUnlimited(true);
+      DefaultDempsyExecutor inboundExecutor = new DefaultDempsyExecutor(1,10000);
+      if (blocking)
+         inboundExecutor.setBlocking(true);
+      else
+         inboundExecutor.setUnlimited(true);
       inboundExecutor.start();
       
       final BasicStatsCollector statsCollector = new BasicStatsCollector();
@@ -107,20 +143,21 @@ public class TransportCompareTest
       final Destination destination = receiver.getDestination();
       
       final byte[][] receivedMessages = new byte[messages.length][];
-      receiver.setListener(new Listener()
+      Listener listener = new Listener()
       {
          final int totalMessages = receivedMessages.length;
          int cur = 0;
          
          @Override public void transportShuttingDown() { }
-         @Override public boolean onMessage(byte[] messageBytes, boolean failFast)  
+         @Override public boolean onMessage(MessageBufferInput messageBytes, boolean failFast)  
          {
-            receivedMessages[cur++] = messageBytes;
+            receivedMessages[cur++] = messageBytes.readByteArray();
             if (cur == totalMessages)
                finishLine.countDown();
             return true;
          }
-      });
+      };
+      receiver.setListener(listener);
       receiver.start();
 
       final AtomicBoolean failed = new AtomicBoolean(false); 
@@ -137,7 +174,11 @@ public class TransportCompareTest
                
                final int size = messages.length;
                for (int i = 0; i < size; i++)
-                  sender.send(messages[i]);
+               {
+                  final MessageBufferOutput msg = senderFactory.prepareMessage();
+                  msg.write(messages[i]);
+                  sender.send(msg);
+               }
             }
             catch (Throwable th) { failed.set(true); }
          }
@@ -162,7 +203,9 @@ public class TransportCompareTest
       for (int i = 0; i < messages.length; i++)
          assertTrue(Arrays.equals(messages[i],receivedMessages[i]));
       
-      return (messages.length  * 1000 / totalTime);
+//      System.out.println("Inbound high water mark is " + inboundExecutor.getHighWaterMark());
+      
+      return totalTime;
    }
    
 }

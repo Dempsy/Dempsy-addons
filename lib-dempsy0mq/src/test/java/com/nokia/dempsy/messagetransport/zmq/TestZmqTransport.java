@@ -12,6 +12,8 @@ import com.nokia.dempsy.messagetransport.MessageTransportException;
 import com.nokia.dempsy.messagetransport.Receiver;
 import com.nokia.dempsy.messagetransport.Sender;
 import com.nokia.dempsy.messagetransport.SenderFactory;
+import com.nokia.dempsy.util.MessageBufferInput;
+import com.nokia.dempsy.util.MessageBufferOutput;
 
 public class TestZmqTransport
 {
@@ -27,7 +29,7 @@ public class TestZmqTransport
          r = transport.createInbound(null,null);
          r.setListener(new Listener() { 
             @Override public void transportShuttingDown(){}
-            @Override public boolean onMessage(byte[] messageBytes, boolean failFast) { return true; }
+            @Override public boolean onMessage(MessageBufferInput messageBytes, boolean failFast) { return true; }
          });
          r.start();
       }
@@ -53,9 +55,9 @@ public class TestZmqTransport
             @Override public void transportShuttingDown() { }
 
             @Override
-            public boolean onMessage(byte[] messageBytes, boolean failFast) throws MessageTransportException
+            public boolean onMessage(MessageBufferInput message, boolean failFast) throws MessageTransportException
             {
-               lastReceived.set(new String(messageBytes));
+               lastReceived.set(new String(message.readByteArray()));
                return true;
             }
          });
@@ -66,12 +68,13 @@ public class TestZmqTransport
          senderFactory = transport.createOutbound(null, null, null);
          Sender s = senderFactory.getSender(d);
 
-         s.send("Hello".getBytes());
+         final MessageBufferOutput msg = senderFactory.prepareMessage();
+         msg.write("Hello".getBytes());
+         s.send(msg);
 
          assertTrue(TestUtils.poll(baseTimeoutMillis, lastReceived, new TestUtils.Condition<AtomicReference<String>>()
          {
-            @Override
-            public boolean conditionMet(AtomicReference<String> o) { return "Hello".equals(o.get()); }
+            @Override public boolean conditionMet(AtomicReference<String> o) { return "Hello".equals(o.get()); }
          }));
       }
       finally

@@ -31,12 +31,14 @@ import com.nokia.dempsy.messagetransport.util.ReceiverIndexedDestination;
 import com.nokia.dempsy.messagetransport.util.SenderConnection;
 import com.nokia.dempsy.messagetransport.util.Server;
 import com.nokia.dempsy.monitoring.StatsCollector;
+import com.nokia.dempsy.util.MessageBufferInput;
+import com.nokia.dempsy.util.MessageBufferOutput;
 
 public class ZmqTransport implements Transport
 {
    private String thisNodeDescription = null;
    private ZMQ.Context context;
-   
+   private boolean blocking = false;
    private long numberOfServers = 0;
    
    private synchronized void deref()
@@ -118,19 +120,16 @@ public class ZmqTransport implements Transport
       protected void readNextMessage(Object acceptReturn, ReceivedMessage messageToFill) throws EOFException, IOException
       {
          // mark as failed by default.
-         messageToFill.messageSize = 0;
-         // TODO: Fix this to read in one message.
-         final byte[] receiverIndex = socket.recv();
-         if (receiverIndex == null) // should only be possible on an interrupt
+         final byte[] rawMessage = socket.recv();
+         if (rawMessage == null) // should only be possible on an interrupt
+         {
+            messageToFill.message = null; // mark failed.
             return;
-         if (receiverIndex.length != 1)
-            throw new IOException("There appears to be an issue with the channel corruption for ZmqReceiver " + destination + ". Resetting it.");
-         messageToFill.receiverIndex = (receiverIndex[0] & 0xff);
-         final byte[] msg = socket.recv();
-         if (msg == null) // should only be possible on an interrupt
-            return;
-         messageToFill.message = msg;
-         messageToFill.messageSize = messageToFill.message.length;
+         }
+         @SuppressWarnings("resource") // mb has no real close.
+         final MessageBufferInput mb = new MessageBufferInput(rawMessage);
+         messageToFill.message = mb;
+         messageToFill.receiverIndex = mb.read();
       }
 
       @Override
@@ -221,6 +220,8 @@ public class ZmqTransport implements Transport
       this.maxNumberOfQueuedOutbound = maxNumberOfQueuedOutbound;
    }
 
+   public void setBlocking(boolean blocking) { this.blocking = blocking; }
+
 
    @Override
    public SenderFactory createOutbound(final DempsyExecutor executor, final StatsCollector statsCollector, final String desc) throws MessageTransportException
@@ -238,17 +239,15 @@ public class ZmqTransport implements Transport
          @Override
          protected SenderConnection makeNewSenderConnection(final ReceiverIndexedDestination baseDestination)
          {
-            return new SenderConnection(baseDestination.toString(),maxNumberOfQueuedOutbound, false, logger)
+            return new SenderConnection(baseDestination.toString(),this, blocking, maxNumberOfQueuedOutbound, false, logger)
             {
                final TcpDestination destination = (TcpDestination)baseDestination;
                ZMQ.Socket socket = null;
                
-               byte[] curReceiverIndex = new byte[1];
-               
                { ref(); }
                
                @Override
-               protected void doSend(final Enqueued message, final boolean batch) throws MessageTransportException
+               protected void doSend(final Enqueued enqueued, final boolean batch) throws MessageTransportException
                {
                   if (socket == null)
                   {
@@ -256,11 +255,12 @@ public class ZmqTransport implements Transport
                      socket.connect ("tcp://" + destination.getInetAddress().getHostAddress() + ":" + destination.getPort());
                   }
 
-                  curReceiverIndex[0] = (byte)message.getReceiverIndex();
-                  if (!socket.send(curReceiverIndex,ZMQ.SNDMORE))
-                     throw new MessageTransportException("Send failed. Who knows why?");
+                  final MessageBufferOutput message = enqueued.message;
+                  final byte[] messageBytes = message.getBuffer();
+                  // See the SenderFactory.prepareMessage where this byte is reserved
+                  messageBytes[0] = (byte)(enqueued.getReceiverIndex());
                   
-                  if (!socket.send(message.messageBytes,0))
+                  if (!socket.send(messageBytes, 0, message.getPosition(), 0))
                      throw new MessageTransportException("Send failed. Who knows why?");
                }
 
@@ -280,6 +280,7 @@ public class ZmqTransport implements Transport
                protected void cleanup() { deref(); }
             };
          }
+         
       };
    }
    
@@ -294,6 +295,8 @@ public class ZmqTransport implements Transport
          defexecutor.setCoresFactor(1.0);
          defexecutor.setAdditionalThreads(1);
          defexecutor.setMaxNumberOfQueuedLimitedTasks(10000);
+         defexecutor.setUnlimited(true);
+         defexecutor.setBlocking(blocking);
          defexecutor.start();
          executor = defexecutor;
          receiverShouldStopExecutor = true;
