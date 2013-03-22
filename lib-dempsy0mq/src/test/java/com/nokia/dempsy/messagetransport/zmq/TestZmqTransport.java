@@ -6,14 +6,14 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 import com.nokia.dempsy.TestUtils;
+import com.nokia.dempsy.message.MessageBufferInput;
+import com.nokia.dempsy.message.MessageBufferOutput;
 import com.nokia.dempsy.messagetransport.Destination;
 import com.nokia.dempsy.messagetransport.Listener;
 import com.nokia.dempsy.messagetransport.MessageTransportException;
 import com.nokia.dempsy.messagetransport.Receiver;
 import com.nokia.dempsy.messagetransport.Sender;
 import com.nokia.dempsy.messagetransport.SenderFactory;
-import com.nokia.dempsy.util.MessageBufferInput;
-import com.nokia.dempsy.util.MessageBufferOutput;
 
 public class TestZmqTransport
 {

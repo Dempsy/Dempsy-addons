@@ -16,6 +16,8 @@ import org.zeromq.ZMQ;
 import com.nokia.dempsy.executor.DefaultDempsyExecutor;
 import com.nokia.dempsy.executor.DempsyExecutor;
 import com.nokia.dempsy.internal.util.SafeString;
+import com.nokia.dempsy.message.MessageBufferInput;
+import com.nokia.dempsy.message.MessageBufferOutput;
 import com.nokia.dempsy.messagetransport.Destination;
 import com.nokia.dempsy.messagetransport.MessageTransportException;
 import com.nokia.dempsy.messagetransport.OverflowHandler;
@@ -31,8 +33,6 @@ import com.nokia.dempsy.messagetransport.util.ReceiverIndexedDestination;
 import com.nokia.dempsy.messagetransport.util.SenderConnection;
 import com.nokia.dempsy.messagetransport.util.Server;
 import com.nokia.dempsy.monitoring.StatsCollector;
-import com.nokia.dempsy.util.MessageBufferInput;
-import com.nokia.dempsy.util.MessageBufferOutput;
 
 public class ZmqTransport implements Transport
 {

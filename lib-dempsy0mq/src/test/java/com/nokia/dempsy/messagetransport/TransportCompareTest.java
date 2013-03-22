@@ -29,11 +29,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.nokia.dempsy.executor.DefaultDempsyExecutor;
+import com.nokia.dempsy.message.MessageBufferInput;
+import com.nokia.dempsy.message.MessageBufferOutput;
 import com.nokia.dempsy.messagetransport.tcp.TcpTransport;
 import com.nokia.dempsy.messagetransport.zmq.ZmqTransport;
 import com.nokia.dempsy.monitoring.basic.BasicStatsCollector;
-import com.nokia.dempsy.util.MessageBufferInput;
-import com.nokia.dempsy.util.MessageBufferOutput;
 
 public class TransportCompareTest
 {
