@@ -20,7 +20,6 @@ import com.nokia.dempsy.message.MessageBufferInput;
 import com.nokia.dempsy.message.MessageBufferOutput;
 import com.nokia.dempsy.messagetransport.Destination;
 import com.nokia.dempsy.messagetransport.MessageTransportException;
-import com.nokia.dempsy.messagetransport.OverflowHandler;
 import com.nokia.dempsy.messagetransport.Receiver;
 import com.nokia.dempsy.messagetransport.SenderFactory;
 import com.nokia.dempsy.messagetransport.Transport;
@@ -139,7 +138,6 @@ public class ZmqTransport implements Transport
    
    private final Map<Destination,SenderConnection> connections = new HashMap<Destination, SenderConnection>();
 
-   private OverflowHandler overflowHandler = null;
    private boolean failFast = false;
    private long maxNumberOfQueuedOutbound = 10000;
 
@@ -198,12 +196,6 @@ public class ZmqTransport implements Transport
          }
          return ret;
       }
-   }
-   
-   @Override
-   public void setOverflowHandler(OverflowHandler overflowHandler)
-   {
-      this.overflowHandler = overflowHandler;
    }
    
    public void setFailFast(boolean failFast) { this.failFast = failFast; }
@@ -302,9 +294,7 @@ public class ZmqTransport implements Transport
          receiverShouldStopExecutor = true;
       }
       
-      ForwardedReceiver receiver = new ForwardedReceiver(server,executor,failFast, receiverShouldStopExecutor);
-      receiver.setOverflowHandler(overflowHandler);
-      return receiver;
+      return new ForwardedReceiver(server,executor,failFast, receiverShouldStopExecutor);
    }
    
    private final static int bindToEphemeralPort(InterruptibleZmqSocket socket) throws MessageTransportException
