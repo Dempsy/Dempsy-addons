@@ -19,7 +19,7 @@
     <dependency>
       <groupId>org.zeromq</groupId>
       <artifactId>jzmq</artifactId>
-      <classifier>native-${os.arch}-${native.os}</classifier>
+      <classifier>native-${os.arch}-${native.os}${native.distro}${native.zmq.version}</classifier>
     </dependency>
   </dependencies>
 </project>

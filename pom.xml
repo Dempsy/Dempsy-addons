@@ -32,7 +32,9 @@
 
   <properties>
     <native.os>${os.name}</native.os>
-    <jzmq.version>2.1.3-SNAPSHOT</jzmq.version>
+    <jzmq.version>3.0.1</jzmq.version>
+    <native.distro>-null</native.distro>
+    <native.zmq.version>-null</native.zmq.version>
   </properties>
 
   <modules>
@@ -93,7 +95,7 @@
         <groupId>org.zeromq</groupId>
         <artifactId>jzmq</artifactId>
         <version>${jzmq.version}</version>
-        <classifier>native-${os.arch}-${native.os}</classifier>
+        <classifier>native-${os.arch}-${native.os}${native.distro}${native.zmq.version}</classifier>
       </dependency>
       <dependency>
         <groupId>junit</groupId>
