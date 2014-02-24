@@ -16,7 +16,6 @@ import org.zeromq.ZMQ;
 import com.nokia.dempsy.executor.DefaultDempsyExecutor;
 import com.nokia.dempsy.executor.DempsyExecutor;
 import com.nokia.dempsy.internal.util.SafeString;
-import com.nokia.dempsy.message.MessageBufferInput;
 import com.nokia.dempsy.message.MessageBufferOutput;
 import com.nokia.dempsy.messagetransport.Destination;
 import com.nokia.dempsy.messagetransport.MessageTransportException;
@@ -116,19 +115,11 @@ public class ZmqTransport implements Transport
       }
 
       @Override
-      protected void readNextMessage(Object acceptReturn, ReceivedMessage messageToFill) throws EOFException, IOException
+      protected byte[] readNextMessage(Object acceptReturn) throws EOFException, IOException
       {
          // mark as failed by default.
          final byte[] rawMessage = socket.recv();
-         if (rawMessage == null) // should only be possible on an interrupt
-         {
-            messageToFill.message = null; // mark failed.
-            return;
-         }
-         @SuppressWarnings("resource") // mb has no real close.
-         final MessageBufferInput mb = new MessageBufferInput(rawMessage);
-         messageToFill.message = mb;
-         messageToFill.receiverIndex = mb.read();
+         return rawMessage; // rawMessage == null should only be possible on an interrupt but it marks an error
       }
 
       @Override
